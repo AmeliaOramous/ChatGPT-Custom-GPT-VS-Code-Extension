@@ -1,22 +1,35 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
-  <rect x="4" y="4" width="56" height="56" rx="12" fill="#060606"/>
-  <circle cx="32" cy="32" r="4" fill="#e5e7eb"/>
-  <!-- arrows sized with a golden-ratio step (phi ≈ 1.618) for spacing/scale -->
-  <g stroke="#e5e7eb" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
-    <!-- top-left -->
-    <path d="M18 18 L26 24" />
-    <path d="M18 18 L23 18 L23 23" />
-    <!-- top-right (offset using phi) -->
-    <path d="M46 19 L38 24" />
-    <path d="M46 19 L41 19 L41 24" />
-    <!-- right-lower -->
-    <path d="M48 35 L40 33" />
-    <path d="M48 35 L45 31 L41 35" />
-    <!-- left-mid (phi-scaled spacing) -->
-    <path d="M16 34 L24 32" />
-    <path d="M16 34 L20 30 L22 34" />
-    <!-- bottom (slightly off-center) -->
-    <path d="M30 48 L32 40" />
-    <path d="M30 48 L36 48 L34 42" />
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none">
+  <!-- tintable icon; VS Code applies currentColor -->
+  <circle cx="12" cy="12" r="2.6" fill="currentColor"/>
+  <g stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" fill="none">
+    <!-- spokes to observer centers -->
+    <path d="M12 12 L12 3.2"/>
+    <path d="M12 12 L19.1 8.6"/>
+    <path d="M12 12 L17.3 19.1"/>
+    <path d="M12 12 L6.1 18.3"/>
+    <path d="M12 12 L4.4 9.1"/>
+    <!-- observers: outer ring + inner ring + unique mark -->
+    <!-- top -->
+    <circle cx="12" cy="3.2" r="1.6"/>
+    <circle cx="12" cy="3.2" r="0.8" stroke-width="1"/>
+    <path d="M11.3 3.2 L12.7 3.2"/>
+    <!-- upper-right -->
+    <circle cx="19.1" cy="8.6" r="1.6"/>
+    <circle cx="19.1" cy="8.6" r="0.8" stroke-width="1"/>
+    <path d="M18.4 8.0 L19.8 9.4"/>
+    <!-- lower-right -->
+    <circle cx="17.3" cy="19.1" r="1.6"/>
+    <circle cx="17.3" cy="19.1" r="0.8" stroke-width="1"/>
+    <path d="M17.3 18.2 L17.3 20.0"/>
+    <path d="M16.6 19.1 L18.0 19.1"/>
+    <!-- lower-left -->
+    <circle cx="6.1" cy="18.3" r="1.6"/>
+    <circle cx="6.1" cy="18.3" r="0.8" stroke-width="1"/>
+    <path d="M5.3 17.5 L6.9 19.1"/>
+    <path d="M5.3 19.1 L6.9 17.5"/>
+    <!-- upper-left -->
+    <circle cx="4.4" cy="9.1" r="1.6"/>
+    <circle cx="4.4" cy="9.1" r="0.8" stroke-width="1"/>
+    <path d="M3.6 8.3 L5.2 9.9"/>
   </g>
 </svg>
