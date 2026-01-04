@@ -1,4 +1,6 @@
 import * as vscode from 'vscode';
+import * as path from 'path';
+import * as dotenv from 'dotenv';
 import { buildContextBundle, ContextBundle } from './context';
 import { createModelClient, Mode, ModelClient } from './modelClient';
 import { CustomGpt, CustomGptService } from './customGptService';
@@ -502,6 +504,7 @@ function loadCustomGpts(): Array<{ id: string; label: string }> {
 }
 
 export function activate(context: vscode.ExtensionContext): void {
+  loadEnv(context);
   const panelProvider = new GptStudioViewProvider(context);
   context.subscriptions.push(
     vscode.commands.registerCommand('gptstudio.reviewLastCommit', reviewLastCommit),
@@ -512,4 +515,9 @@ export function activate(context: vscode.ExtensionContext): void {
 
 export function deactivate(): void {
   // noop
+}
+
+function loadEnv(context: vscode.ExtensionContext): void {
+  const envPath = path.join(context.extensionPath, '.env');
+  dotenv.config({ path: envPath });
 }
