@@ -6,6 +6,7 @@ import { createModelClient, Mode, ModelClient } from './modelClient';
 import { CustomGpt, CustomGptService } from './customGptService';
 
 const gptstudioLogger = vscode.window.createOutputChannel('GPTStudio');
+gptstudioLogger.appendLine('GPTStudio module loaded.');
 
 type GitExtension = {
   getAPI(version: number): {
@@ -503,23 +504,40 @@ function loadCustomGpts(): Array<{ id: string; label: string }> {
     .map((id) => ({ id, label: id }));
 }
 
+function loadEnv(context: vscode.ExtensionContext): void {
+  try {
+    const envPath = path.join(context.extensionPath, '.env');
+    const result = dotenv.config({ path: envPath });
+    if (result.error) {
+      gptstudioLogger.appendLine(`[Env] No .env loaded or error: ${result.error.message}`);
+    } else {
+      gptstudioLogger.appendLine('[Env] Loaded .env file.');
+    }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    gptstudioLogger.appendLine(`[Env] Failed to load .env: ${message}`);
+  }
+}
+
 export function activate(context: vscode.ExtensionContext): void {
-  loadEnv(context);
-  gptstudioLogger.appendLine('Activating GPTStudio extension…');
-  const panelProvider = new GptStudioViewProvider(context);
-  context.subscriptions.push(
-    vscode.commands.registerCommand('gptstudio.reviewLastCommit', reviewLastCommit),
-    vscode.commands.registerCommand('gptstudio.applySuggestedPatch', applySuggestedPatch),
-    vscode.window.registerWebviewViewProvider(GptStudioViewProvider.viewId, panelProvider)
-  );
-  gptstudioLogger.appendLine('GPTStudio extension activated.');
+  gptstudioLogger.appendLine('Activating GPTStudio extension.');
+  try {
+    loadEnv(context);
+    const panelProvider = new GptStudioViewProvider(context);
+    context.subscriptions.push(
+      vscode.commands.registerCommand('gptstudio.reviewLastCommit', reviewLastCommit),
+      vscode.commands.registerCommand('gptstudio.applySuggestedPatch', applySuggestedPatch),
+      vscode.window.registerWebviewViewProvider(GptStudioViewProvider.viewId, panelProvider)
+    );
+    gptstudioLogger.appendLine('GPTStudio extension activated.');
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    gptstudioLogger.appendLine(`[Activation error] ${message}`);
+    void vscode.window.showErrorMessage(`GPTStudio failed to activate: ${message}`);
+    throw err;
+  }
 }
 
 export function deactivate(): void {
   // noop
-}
-
-function loadEnv(context: vscode.ExtensionContext): void {
-  const envPath = path.join(context.extensionPath, '.env');
-  dotenv.config({ path: envPath });
 }
