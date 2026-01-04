@@ -584,17 +584,18 @@ function loadEnv(context: vscode.ExtensionContext): void {
   }
 }
 
-export function activate(context: vscode.ExtensionContext): void {
+export async function activate(context: vscode.ExtensionContext): Promise<void> {
   gptstudioLogger.appendLine('Activating GPTStudio extension.');
   try {
     loadEnv(context);
-    const apiConfig = resolveApiConfig(context);
+    const apiConfig = await resolveApiConfig(context);
     const panelProvider = new GptStudioViewProvider(context, apiConfig);
     context.subscriptions.push(
       vscode.commands.registerCommand('gptstudio.reviewLastCommit', reviewLastCommit),
       vscode.commands.registerCommand('gptstudio.applySuggestedPatch', applySuggestedPatch),
       vscode.commands.registerCommand('gptstudio.setApiKey', () => setApiKey(context, panelProvider)),
       vscode.commands.registerCommand('gptstudio.clearApiKey', () => clearApiKey(context, panelProvider)),
+      vscode.commands.registerCommand('gptstudio.pingApiStatus', () => pingApiStatus(context)),
       vscode.window.registerWebviewViewProvider(GptStudioViewProvider.viewId, panelProvider)
     );
     gptstudioLogger.appendLine('GPTStudio extension activated.');
@@ -610,9 +611,11 @@ export function deactivate(): void {
   // noop
 }
 
-function resolveApiConfig(context: vscode.ExtensionContext): { apiKey?: string; baseUrl?: string } {
-  const apiKey = process.env.OPENAI_API_KEY ?? process.env.GPTSTUDIO_API_KEY;
-  const baseUrl = process.env.OPENAI_BASE_URL ?? process.env.GPTSTUDIO_API_BASE;
+async function resolveApiConfig(context: vscode.ExtensionContext): Promise<{ apiKey?: string; baseUrl?: string }> {
+  const storedKey = await context.secrets.get(SECRET_API_KEY);
+  const storedBase = await context.secrets.get(SECRET_API_BASE);
+  const apiKey = storedKey ?? process.env.OPENAI_API_KEY ?? process.env.GPTSTUDIO_API_KEY;
+  const baseUrl = storedBase ?? process.env.OPENAI_BASE_URL ?? process.env.GPTSTUDIO_API_BASE;
 
   return {
     apiKey: apiKey ?? undefined,
@@ -635,7 +638,7 @@ async function setApiKey(
   }
   await context.secrets.store(SECRET_API_KEY, value);
   gptstudioLogger.appendLine('[API] Stored API key in secret storage.');
-  provider.updateApiConfig(value, undefined);
+  provider.updateApiConfig(value, await context.secrets.get(SECRET_API_BASE));
   void vscode.window.showInformationMessage('GPTStudio API key saved to secret storage.');
 }
 
@@ -645,6 +648,35 @@ async function clearApiKey(
 ): Promise<void> {
   await context.secrets.delete(SECRET_API_KEY);
   gptstudioLogger.appendLine('[API] Cleared stored API key.');
-  provider.updateApiConfig(undefined, undefined);
+  provider.updateApiConfig(undefined, await context.secrets.get(SECRET_API_BASE));
   void vscode.window.showInformationMessage('GPTStudio API key cleared.');
+}
+
+async function pingApiStatus(context: vscode.ExtensionContext): Promise<void> {
+  const apiKey = (await context.secrets.get(SECRET_API_KEY)) ?? process.env.OPENAI_API_KEY ?? process.env.GPTSTUDIO_API_KEY;
+  const baseUrl = (await context.secrets.get(SECRET_API_BASE)) ?? process.env.OPENAI_BASE_URL ?? process.env.GPTSTUDIO_API_BASE ?? 'https://api.openai.com/v1';
+  if (!apiKey) {
+    void vscode.window.showErrorMessage('GPTStudio: No API key found. Run "GPTStudio: Set API Key" first.');
+    return;
+  }
+  try {
+    const res = await fetch(`${baseUrl.replace(/\/$/, '')}/models`, {
+      method: 'GET',
+      headers: {
+        Authorization: `Bearer ${apiKey}`
+      }
+    });
+    if (!res.ok) {
+      const text = await res.text();
+      gptstudioLogger.appendLine(`[Ping] Failed ${res.status}: ${text}`);
+      void vscode.window.showErrorMessage(`GPTStudio API ping failed (${res.status}). See output for details.`);
+      return;
+    }
+    gptstudioLogger.appendLine('[Ping] API reachable.');
+    void vscode.window.showInformationMessage('GPTStudio API ping succeeded.');
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    gptstudioLogger.appendLine(`[Ping] Error: ${message}`);
+    void vscode.window.showErrorMessage(`GPTStudio API ping error: ${message}`);
+  }
 }

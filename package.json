@@ -16,6 +16,7 @@
     "onCommand:gptstudio.applySuggestedPatch",
     "onCommand:gptstudio.setApiKey",
     "onCommand:gptstudio.clearApiKey",
+    "onCommand:gptstudio.pingApiStatus",
     "onView:gptstudio.panel"
   ],
   "main": "./dist/extension.js",
@@ -54,6 +55,10 @@
       {
         "command": "gptstudio.clearApiKey",
         "title": "GPTStudio: Clear Stored API Key"
+      },
+      {
+        "command": "gptstudio.pingApiStatus",
+        "title": "GPTStudio: Ping API Status"
       }
     ],
     "views": {

@@ -20,6 +20,7 @@ npm run compile
 - `GPTStudio: Apply Suggested Patch` (`gptstudio.applySuggestedPatch`): placeholder for a guarded apply flow.
 - GPTStudio Panel (`gptstudio.panel` view in Explorer): opens a sidebar webview to select a model, pick a Custom GPT persona, choose a mode (Chat, Agent, Full Agent), see a preview of workspace files included as context (file list + open buffers), and send prompts. Streams responses; falls back to a mock client if no API key is set.
 - `GPTStudio: Set API Key` / `GPTStudio: Clear Stored API Key`: store your API key securely in VS Code Secret Storage (per user, not shared). Without a key, the panel uses a mock client.
+- `GPTStudio: Ping API Status`: checks reachability of the configured API using the stored/env key.
 
 ### UI
 - Dedicated activity bar icon opens the GPTStudio view container. Inside, the GPTStudio Panel hosts model/custom GPT selection, mode, prompt, context preview, and streamed responses.
