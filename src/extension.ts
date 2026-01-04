@@ -70,10 +70,18 @@ type WebviewMessage =
   | { type: 'ready' }
   | { type: 'chat'; content: string }
   | { type: 'modelChanged'; model: string }
+  | { type: 'customGptChanged'; id: string }
   | { type: 'modeChanged'; mode: Mode };
 
 type ExtensionMessage =
-  | { type: 'state'; models: Array<{ id: string; label: string }>; selectedModel: string; mode: Mode }
+  | {
+      type: 'state';
+      models: Array<{ id: string; label: string }>;
+      selectedModel: string;
+      customGpts: Array<{ id: string; label: string }>;
+      selectedCustomGpt?: string;
+      mode: Mode;
+    }
   | { type: 'context'; files: string[]; openFiles: Array<{ path: string }> }
   | { type: 'responseStart' }
   | { type: 'responseChunk'; text: string }
@@ -91,12 +99,16 @@ class GptStudioViewProvider implements vscode.WebviewViewProvider {
   public static readonly viewId = 'gptstudio.panel';
   private view?: vscode.WebviewView;
   private selectedModel = MODEL_CHOICES[0].id;
+  private customGpts: Array<{ id: string; label: string }> = [];
+  private selectedCustomGpt?: string;
   private mode: Mode = 'chat';
   private modelClient: ModelClient;
   private lastContext?: ContextBundle;
 
   constructor(private readonly context: vscode.ExtensionContext) {
     this.modelClient = createModelClient();
+    this.customGpts = loadCustomGpts();
+    this.selectedCustomGpt = this.customGpts[0]?.id;
   }
 
   resolveWebviewView(webviewView: vscode.WebviewView): void | Thenable<void> {
@@ -117,6 +129,10 @@ class GptStudioViewProvider implements vscode.WebviewViewProvider {
         break;
       case 'modelChanged':
         this.selectedModel = message.model;
+        this.postState();
+        break;
+      case 'customGptChanged':
+        this.selectedCustomGpt = message.id;
         this.postState();
         break;
       case 'modeChanged':
@@ -142,6 +158,7 @@ class GptStudioViewProvider implements vscode.WebviewViewProvider {
         {
           model: this.selectedModel,
           mode: this.mode,
+          customGpt: this.selectedCustomGpt,
           prompt: content,
           context
         },
@@ -170,6 +187,8 @@ class GptStudioViewProvider implements vscode.WebviewViewProvider {
       type: 'state',
       models: MODEL_CHOICES,
       selectedModel: this.selectedModel,
+      customGpts: this.customGpts,
+      selectedCustomGpt: this.selectedCustomGpt,
       mode: this.mode
     };
     this.view?.webview.postMessage(message);
@@ -314,6 +333,8 @@ class GptStudioViewProvider implements vscode.WebviewViewProvider {
         <select id="model"></select>
       </div>
     </div>
+    <div class="section-title">Custom GPT</div>
+    <select id="customGpt"></select>
     <div class="section-title">Mode</div>
     <div class="row" id="modes">
       <div class="pill active" data-mode="chat">Chat</div>
@@ -321,9 +342,9 @@ class GptStudioViewProvider implements vscode.WebviewViewProvider {
       <div class="pill" data-mode="full-agent">Full Agent (guarded)</div>
     </div>
     <div class="section-title">Context preview</div>
-    <div class="context" id="context">Loading workspace filesâ€¦</div>
+    <div class="context" id="context">Loading workspace files...</div>
     <div class="section-title">Prompt</div>
-    <textarea id="prompt" placeholder="Ask a question or give an instruction with project contextâ€¦"></textarea>
+    <textarea id="prompt" placeholder="Ask a question or give an instruction with project context."></textarea>
     <button id="send" style="margin-top: 10px;">Send to Model</button>
     <div class="section-title">Transcript</div>
     <div class="log" id="log">Ready.</div>
@@ -331,6 +352,7 @@ class GptStudioViewProvider implements vscode.WebviewViewProvider {
     <script nonce="${nonce}">
     const vscode = acquireVsCodeApi();
     const modelSelect = document.getElementById('model');
+    const customGptSelect = document.getElementById('customGpt');
     const promptEl = document.getElementById('prompt');
     const logEl = document.getElementById('log');
     const contextEl = document.getElementById('context');
@@ -360,6 +382,23 @@ class GptStudioViewProvider implements vscode.WebviewViewProvider {
         modePills.forEach(pill => {
           pill.classList.toggle('active', pill.dataset.mode === msg.mode);
         });
+        customGptSelect.innerHTML = '';
+        if (!msg.customGpts || msg.customGpts.length === 0) {
+          const o = document.createElement('option');
+          o.value = '';
+          o.textContent = 'No custom GPTs configured';
+          customGptSelect.appendChild(o);
+          customGptSelect.disabled = true;
+        } else {
+          customGptSelect.disabled = false;
+          msg.customGpts.forEach(opt => {
+            const o = document.createElement('option');
+            o.value = opt.id;
+            o.textContent = opt.label;
+            if (opt.id === msg.selectedCustomGpt) o.selected = true;
+            customGptSelect.appendChild(o);
+          });
+        }
       } else if (msg.type === 'context') {
         const lines = [];
         lines.push('Files:', ...(msg.files && msg.files.length ? msg.files : ['No workspace files found.']));
@@ -380,6 +419,9 @@ class GptStudioViewProvider implements vscode.WebviewViewProvider {
 
     modelSelect.addEventListener('change', () => {
       vscode.postMessage({ type: 'modelChanged', model: modelSelect.value });
+    });
+    customGptSelect.addEventListener('change', () => {
+      vscode.postMessage({ type: 'customGptChanged', id: customGptSelect.value });
     });
 
     modePills.forEach(pill => {
@@ -411,6 +453,21 @@ class GptStudioViewProvider implements vscode.WebviewViewProvider {
 function getNonce(): string {
   const possible = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
   return Array.from({ length: 16 }, () => possible.charAt(Math.floor(Math.random() * possible.length))).join('');
+}
+
+function loadCustomGpts(): Array<{ id: string; label: string }> {
+  const raw = process.env.GPTSTUDIO_CUSTOM_GPTS;
+  if (!raw) {
+    return [
+      { id: 'gertrude', label: 'Gertrude (review hawk)' },
+      { id: 'ida', label: 'Ida (integrator)' }
+    ];
+  }
+  return raw
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .map((id) => ({ id, label: id }));
 }
 
 export function activate(context: vscode.ExtensionContext): void {

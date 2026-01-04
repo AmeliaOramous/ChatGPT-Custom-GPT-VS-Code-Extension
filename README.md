@@ -18,7 +18,7 @@ npm run compile
 ### Commands
 - `GPTStudio: Review Last Commit` (`gptstudio.reviewLastCommit`): activates Git API, grabs the most recent commit, fetches its diff, and prints stub output to the "GPTStudio Review" channel. Warns if the diff is very large before you ship it to a model.
 - `GPTStudio: Apply Suggested Patch` (`gptstudio.applySuggestedPatch`): placeholder for a guarded apply flow.
-- GPTStudio Panel (`gptstudio.panel` view in Explorer): opens a sidebar webview to select a model, choose a mode (Chat, Agent, Full Agent), see a preview of workspace files included as context (file list + open buffers), and send prompts. Streams responses; falls back to a mock client if no API key is set.
+- GPTStudio Panel (`gptstudio.panel` view in Explorer): opens a sidebar webview to select a model, pick a Custom GPT persona, choose a mode (Chat, Agent, Full Agent), see a preview of workspace files included as context (file list + open buffers), and send prompts. Streams responses; falls back to a mock client if no API key is set.
 
 ### Dev Notes
 - Code lives in `src/extension.ts`; compiled output goes to `dist/`.
@@ -26,4 +26,5 @@ npm run compile
 - Model client selection:
   - Set `OPENAI_API_KEY` (or `GPTSTUDIO_API_KEY`) to use OpenAI models; optionally set `OPENAI_BASE_URL` (`GPTSTUDIO_API_BASE`) for a custom endpoint.
   - Without an API key, a mock client echoes prompts and context so the panel is demo-ready.
+  - Custom GPT personas: set `GPTSTUDIO_CUSTOM_GPTS` to a comma-separated list (e.g., `gertrude,ida`) to populate the Custom GPT selector; otherwise defaults to Gertrude/Ida demo entries.
 - Next steps: plug panel output into the commit review flow, add patch application with an explicit approval dialog and safe-file allowlist, and persist conversations per workspace.

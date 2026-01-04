@@ -5,6 +5,7 @@ export type Mode = 'chat' | 'agent' | 'full-agent';
 export type ChatRequest = {
   model: string;
   mode: Mode;
+  customGpt?: string;
   prompt: string;
   context: ContextBundle;
 };
@@ -26,10 +27,11 @@ export function createModelClient(): ModelClient {
 
 class MockModelClient implements ModelClient {
   async chat(request: ChatRequest, onChunk?: (chunk: string) => void): Promise<string> {
-    const { prompt, model, mode, context } = request;
+    const { prompt, model, mode, context, customGpt } = request;
     const response = [
       `Model: ${model}`,
       `Mode: ${mode}`,
+      `Custom GPT: ${customGpt ?? 'none'}`,
       `Workspace: ${context.workspaceName}`,
       `Files: ${context.files.slice(0, 5).join(', ') || 'None'}`,
       `Open files: ${context.openFiles.map((f) => f.path).join(', ') || 'None'}`,
@@ -58,8 +60,11 @@ class OpenAiModelClient implements ModelClient {
       'You are GPTStudio, a coding copilot working inside VS Code.',
       'Be concise. Return plain text.',
       'Use the provided context (files, open buffers) to ground answers.',
-      `Mode: ${request.mode}`
-    ].join('\n');
+      `Mode: ${request.mode}`,
+      request.customGpt ? `Persona: ${request.customGpt}` : undefined
+    ]
+      .filter(Boolean)
+      .join('\n');
 
     const body = {
       model: request.model === 'custom-endpoint' ? 'gpt-4.1' : request.model,
