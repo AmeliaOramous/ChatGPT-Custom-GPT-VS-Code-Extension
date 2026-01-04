@@ -1,0 +1,54 @@
+{
+  "name": "gptstudio",
+  "displayName": "GPTStudio",
+  "description": "Gertrude-style commit review helper for VS Code.",
+  "version": "0.0.1-alpha",
+  "publisher": "your-name",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onCommand:gptstudio.reviewLastCommit",
+    "onCommand:gptstudio.applySuggestedPatch",
+    "onView:gptstudio.panel"
+  ],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "gptstudio.reviewLastCommit",
+        "title": "GPTStudio: Review Last Commit"
+      },
+      {
+        "command": "gptstudio.applySuggestedPatch",
+        "title": "GPTStudio: Apply Suggested Patch"
+      }
+    ],
+    "views": {
+      "explorer": [
+        {
+          "id": "gptstudio.panel",
+          "name": "GPTStudio Panel"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "compile": "tsc -p .",
+    "watch": "tsc -w -p .",
+    "lint": "eslint src --ext .ts",
+    "test": "node ./out/test/runTest.js"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "@types/vscode": "^1.85.0",
+    "@vscode/test-electron": "^2.3.8",
+    "eslint": "^8.56.0",
+    "eslint-config-prettier": "^9.1.0",
+    "eslint-plugin-prettier": "^5.1.3",
+    "typescript": "^5.3.3"
+  }
+}

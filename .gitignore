@@ -1,0 +1,8 @@
+dist
+node_modules
+.vscode-test
+.tools
+*.vsix
+*.log
+GPT Instructions.txt
+temp.txt
