@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import { buildContextBundle, ContextBundle } from './context';
 import { createModelClient, Mode, ModelClient } from './modelClient';
+import { CustomGpt, CustomGptService } from './customGptService';
 
 type GitExtension = {
   getAPI(version: number): {
@@ -99,16 +100,23 @@ class GptStudioViewProvider implements vscode.WebviewViewProvider {
   public static readonly viewId = 'gptstudio.panel';
   private view?: vscode.WebviewView;
   private selectedModel = MODEL_CHOICES[0].id;
-  private customGpts: Array<{ id: string; label: string }> = [];
+  private customGpts: CustomGpt[] = [];
   private selectedCustomGpt?: string;
   private mode: Mode = 'chat';
   private modelClient: ModelClient;
   private lastContext?: ContextBundle;
+  private readonly logger: vscode.OutputChannel;
+  private readonly customGptService: CustomGptService;
 
   constructor(private readonly context: vscode.ExtensionContext) {
     this.modelClient = createModelClient();
-    this.customGpts = loadCustomGpts();
-    this.selectedCustomGpt = this.customGpts[0]?.id;
+    this.logger = vscode.window.createOutputChannel('GPTStudio');
+    this.customGptService = new CustomGptService({
+      apiKey: process.env.OPENAI_API_KEY || process.env.GPTSTUDIO_API_KEY,
+      baseUrl: process.env.OPENAI_BASE_URL || process.env.GPTSTUDIO_API_BASE,
+      envList: process.env.GPTSTUDIO_CUSTOM_GPTS,
+      logger: this.logger
+    });
   }
 
   resolveWebviewView(webviewView: vscode.WebviewView): void | Thenable<void> {
@@ -119,6 +127,9 @@ class GptStudioViewProvider implements vscode.WebviewViewProvider {
     };
     webview.html = this.getHtml(webview);
     webview.onDidReceiveMessage((message: WebviewMessage) => this.handleMessage(message));
+
+    // Kick off async load of custom GPTs without blocking UI
+    void this.refreshCustomGpts();
   }
 
   private async handleMessage(message: WebviewMessage): Promise<void> {
@@ -152,6 +163,9 @@ class GptStudioViewProvider implements vscode.WebviewViewProvider {
     this.lastContext = context;
     this.postContextPreview(context);
     this.view?.webview.postMessage({ type: 'responseStart' } satisfies ExtensionMessage);
+    this.logger.appendLine(
+      `[Chat] model=${this.selectedModel} mode=${this.mode} customGpt=${this.selectedCustomGpt ?? 'none'}`
+    );
 
     try {
       const final = await this.modelClient.chat(
@@ -167,6 +181,7 @@ class GptStudioViewProvider implements vscode.WebviewViewProvider {
       this.view?.webview.postMessage({ type: 'responseDone', text: final } satisfies ExtensionMessage);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Unknown error';
+      this.logger.appendLine(`[Chat error] ${message}`);
       this.view?.webview.postMessage({ type: 'error', message } satisfies ExtensionMessage);
     }
   }
@@ -192,6 +207,22 @@ class GptStudioViewProvider implements vscode.WebviewViewProvider {
       mode: this.mode
     };
     this.view?.webview.postMessage(message);
+  }
+
+  private async refreshCustomGpts(): Promise<void> {
+    try {
+      const list = await this.customGptService.load();
+      this.customGpts = list;
+      this.selectedCustomGpt = list[0]?.id;
+      this.postState();
+    } catch (err) {
+      this.logger.appendLine(
+        `[Custom GPT load] ${err instanceof Error ? err.message : 'Unknown error loading custom GPTs.'}`
+      );
+      this.customGpts = [];
+      this.selectedCustomGpt = undefined;
+      this.postState();
+    }
   }
 
   private getHtml(webview: vscode.Webview): string {

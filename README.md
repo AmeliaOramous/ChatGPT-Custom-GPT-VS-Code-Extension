@@ -26,5 +26,6 @@ npm run compile
 - Model client selection:
   - Set `OPENAI_API_KEY` (or `GPTSTUDIO_API_KEY`) to use OpenAI models; optionally set `OPENAI_BASE_URL` (`GPTSTUDIO_API_BASE`) for a custom endpoint.
   - Without an API key, a mock client echoes prompts and context so the panel is demo-ready.
-  - Custom GPT personas: set `GPTSTUDIO_CUSTOM_GPTS` to a comma-separated list (e.g., `gertrude,ida`) to populate the Custom GPT selector; otherwise defaults to Gertrude/Ida demo entries.
-- Next steps: plug panel output into the commit review flow, add patch application with an explicit approval dialog and safe-file allowlist, and persist conversations per workspace.
+  - Custom GPT personas: `src/customGptService.ts` pulls from the GPT API (`/gpts`) when an API key is present; you can also set `GPTSTUDIO_CUSTOM_GPTS` to a comma-separated list (e.g., `gertrude,ida`). Defaults fall back to demo entries if nothing is configured.
+- Tests: `npm test` (Vitest) covers custom GPT loading and mock model client persona handling.
+- Security/quality: no production vulnerabilities (`npm audit --omit=dev` is clean); dev-only moderates remain from tooling.
