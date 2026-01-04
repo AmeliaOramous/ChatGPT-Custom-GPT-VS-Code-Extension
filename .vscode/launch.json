@@ -6,6 +6,9 @@
       "type": "extensionHost",
       "request": "launch",
       "runtimeExecutable": "${execPath}",
+      "runtimeArgs": [
+        "--disable-extensions"
+      ],
       "args": [
         "--extensionDevelopmentPath=${workspaceFolder}"
       ],
