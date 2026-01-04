@@ -82,6 +82,7 @@ type WebviewMessage =
   | { type: 'customGptChanged'; id: string }
   | { type: 'modeChanged'; mode: Mode }
   | { type: 'retryConnection' }
+  | { type: 'webviewLog'; message: string }
   | {
       type: 'webviewError';
       message: string;
@@ -198,6 +199,9 @@ class GptStudioViewProvider implements vscode.WebviewViewProvider {
             message.stack ?? ''
           }`
         );
+        break;
+      case 'webviewLog':
+        gptstudioLogger.appendLine(`[Webview log] ${message.message}`);
         break;
       default:
         this.view?.webview.postMessage({ type: 'error', message: 'Unknown message type' } satisfies ExtensionMessage);
@@ -481,6 +485,10 @@ class GptStudioViewProvider implements vscode.WebviewViewProvider {
     window.addEventListener('message', event => {
       const msg = event.data;
       if (!msg || !msg.type) return;
+      if (msg.type === 'init') {
+        vscode.postMessage({ type: 'webviewLog', message: 'Script initialized' });
+        return;
+      }
       if (msg.type === 'state') {
         modelSelect.innerHTML = '';
         msg.models.forEach(opt => {
@@ -557,6 +565,7 @@ class GptStudioViewProvider implements vscode.WebviewViewProvider {
       vscode.postMessage({ type: 'retryConnection' });
     });
 
+    vscode.postMessage({ type: 'init' });
     vscode.postMessage({ type: 'ready' });
   </script>
 
@@ -613,6 +622,14 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       vscode.commands.registerCommand('gptstudio.clearApiKey', () => clearApiKey(context, panelProvider)),
       vscode.commands.registerCommand('gptstudio.pingApiStatus', () => pingApiStatusCommand(context)),
       vscode.commands.registerCommand('gptstudio.refreshPanel', () => refreshPanel(panelProvider, context)),
+      vscode.commands.registerCommand('gptstudio.openWebviewConsole', () =>
+        vscode.commands.executeCommand('workbench.action.webview.openDeveloperTools')
+      ),
+      vscode.commands.registerCommand('gptstudio.reloadPanel', () =>
+        vscode.commands.executeCommand('workbench.action.webview.reloadWebviewAction')
+      ),
+      vscode.commands.registerCommand('gptstudio.fetchModels', () => fetchModelsCommand(context)),
+      vscode.commands.registerCommand('gptstudio.fetchCustomGpts', () => fetchCustomGptsCommand(context)),
       vscode.window.registerWebviewViewProvider(GptStudioViewProvider.viewId, panelProvider)
     );
     gptstudioLogger.appendLine('GPTStudio extension activated.');
@@ -741,4 +758,63 @@ async function refreshPanel(provider: GptStudioViewProvider, context: vscode.Ext
   gptstudioLogger.appendLine('[Refresh] Manual refresh triggered.');
   await provider.refreshCustomGpts();
   await pingApiStatusInternal(context, { silent: false, label: 'refresh' });
+}
+
+async function fetchModelsCommand(context: vscode.ExtensionContext): Promise<void> {
+  const { apiKey, baseUrl } = await resolveApiConfig(context);
+  if (!apiKey) {
+    void vscode.window.showErrorMessage('GPTStudio: No API key found. Set it first.');
+    return;
+  }
+  const url = `${(baseUrl ?? 'https://api.openai.com/v1').replace(/\/$/, '')}/models`;
+  gptstudioLogger.appendLine(`[FetchModels] GET ${url}`);
+  try {
+    const res = await fetch(url, {
+      method: 'GET',
+      headers: { Authorization: `Bearer ${apiKey}` }
+    });
+    const text = await res.text();
+    gptstudioLogger.appendLine(`[FetchModels] Status ${res.status} ${res.statusText}`);
+    gptstudioLogger.appendLine(text.slice(0, 2000));
+    if (!res.ok) {
+      void vscode.window.showErrorMessage(`Fetch models failed (${res.status}). See output for details.`);
+    } else {
+      void vscode.window.showInformationMessage('Fetched models; see GPTStudio output.');
+    }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    gptstudioLogger.appendLine(`[FetchModels] Error: ${message}`);
+    void vscode.window.showErrorMessage(`Fetch models error: ${message}`);
+  }
+}
+
+async function fetchCustomGptsCommand(context: vscode.ExtensionContext): Promise<void> {
+  const { apiKey, baseUrl } = await resolveApiConfig(context);
+  if (!apiKey) {
+    void vscode.window.showErrorMessage('GPTStudio: No API key found. Set it first.');
+    return;
+  }
+  const endpointOverride = process.env.GPTSTUDIO_GPTS_ENDPOINT;
+  const url =
+    (endpointOverride && endpointOverride !== '' ? endpointOverride : `${(baseUrl ?? 'https://api.openai.com/v1')}`)
+      .replace(/\/$/, '') + '/gpts';
+  gptstudioLogger.appendLine(`[FetchCustomGPTs] GET ${url}`);
+  try {
+    const res = await fetch(url, {
+      method: 'GET',
+      headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' }
+    });
+    const text = await res.text();
+    gptstudioLogger.appendLine(`[FetchCustomGPTs] Status ${res.status} ${res.statusText}`);
+    gptstudioLogger.appendLine(text.slice(0, 2000));
+    if (!res.ok) {
+      void vscode.window.showErrorMessage(`Fetch custom GPTs failed (${res.status}). See output for details.`);
+    } else {
+      void vscode.window.showInformationMessage('Fetched custom GPTs; see GPTStudio output.');
+    }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    gptstudioLogger.appendLine(`[FetchCustomGPTs] Error: ${message}`);
+    void vscode.window.showErrorMessage(`Fetch custom GPTs error: ${message}`);
+  }
 }

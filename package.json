@@ -18,6 +18,10 @@
     "onCommand:gptstudio.clearApiKey",
     "onCommand:gptstudio.pingApiStatus",
     "onCommand:gptstudio.refreshPanel",
+    "onCommand:gptstudio.openWebviewConsole",
+    "onCommand:gptstudio.reloadPanel",
+    "onCommand:gptstudio.fetchModels",
+    "onCommand:gptstudio.fetchCustomGpts",
     "onView:gptstudio.panel"
   ],
   "main": "./dist/extension.js",
@@ -64,6 +68,22 @@
       {
         "command": "gptstudio.refreshPanel",
         "title": "GPTStudio: Refresh Panel"
+      },
+      {
+        "command": "gptstudio.openWebviewConsole",
+        "title": "GPTStudio: Open Webview Developer Tools"
+      },
+      {
+        "command": "gptstudio.reloadPanel",
+        "title": "GPTStudio: Reload Panel"
+      },
+      {
+        "command": "gptstudio.fetchModels",
+        "title": "GPTStudio: Fetch Models (debug)"
+      },
+      {
+        "command": "gptstudio.fetchCustomGpts",
+        "title": "GPTStudio: Fetch Custom GPTs (debug)"
       }
     ],
     "views": {

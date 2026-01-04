@@ -62,16 +62,13 @@ export class CustomGptService {
       this.log('Custom GPT API fetch disabled via override.');
       return false;
     }
-    if (this.endpointOverride) {
-      return true;
-    }
-    // Default off to avoid 404s against providers without GPTs support.
-    this.log('Custom GPT API fetch skipped (no endpoint override). Using env/defaults.');
-    return false;
+    // Default on; endpointOverride lets users point to a compatible GPT list API.
+    return true;
   }
 
   private async fetchFromApi(): Promise<CustomGpt[]> {
-    const endpoint = this.endpointOverride ?? `${this.baseUrl}/gpts`;
+    const endpoint = (this.endpointOverride ?? `${this.baseUrl}/gpts`).replace(/\/$/, '');
+    this.log(`Fetching custom GPTs from ${endpoint}`);
     const res = await fetch(endpoint, {
       method: 'GET',
       headers: {
