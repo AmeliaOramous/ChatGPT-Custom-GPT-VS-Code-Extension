@@ -81,6 +81,7 @@ type WebviewMessage =
   | { type: 'modelChanged'; model: string }
   | { type: 'customGptChanged'; id: string }
   | { type: 'modeChanged'; mode: Mode }
+  | { type: 'retryConnection' }
   | {
       type: 'webviewError';
       message: string;
@@ -180,6 +181,11 @@ class GptStudioViewProvider implements vscode.WebviewViewProvider {
         break;
       case 'chat':
         await this.handleChat(message.content);
+        break;
+      case 'retryConnection':
+        gptstudioLogger.appendLine('[Webview] Retry connection requested.');
+        await this.refreshCustomGpts();
+        void pingApiStatusInternal(this.context, { silent: true });
         break;
       case 'webviewError':
         gptstudioLogger.appendLine(
@@ -425,6 +431,7 @@ class GptStudioViewProvider implements vscode.WebviewViewProvider {
     <div class="section-title">Prompt</div>
     <textarea id="prompt" placeholder="Ask a question or give an instruction with project context."></textarea>
     <button id="send" style="margin-top: 10px;">Send to Model</button>
+    <button id="retry" style="margin-top: 6px; background: transparent; color: var(--text); border: 1px solid var(--border);">Retry Connection</button>
     <div class="section-title">Transcript</div>
     <div class="log" id="log">Ready.</div>
   </div>
@@ -540,6 +547,10 @@ class GptStudioViewProvider implements vscode.WebviewViewProvider {
       vscode.postMessage({ type: 'chat', content });
       setLog('Sending to model...');
     });
+    document.getElementById('retry').addEventListener('click', () => {
+      setLog('Retrying connection…');
+      vscode.postMessage({ type: 'retryConnection' });
+    });
 
     vscode.postMessage({ type: 'ready' });
   </script>
@@ -595,7 +606,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       vscode.commands.registerCommand('gptstudio.applySuggestedPatch', applySuggestedPatch),
       vscode.commands.registerCommand('gptstudio.setApiKey', () => setApiKey(context, panelProvider)),
       vscode.commands.registerCommand('gptstudio.clearApiKey', () => clearApiKey(context, panelProvider)),
-      vscode.commands.registerCommand('gptstudio.pingApiStatus', () => pingApiStatus(context)),
+      vscode.commands.registerCommand('gptstudio.pingApiStatus', () => pingApiStatusCommand(context)),
       vscode.window.registerWebviewViewProvider(GptStudioViewProvider.viewId, panelProvider)
     );
     gptstudioLogger.appendLine('GPTStudio extension activated.');
@@ -652,40 +663,66 @@ async function clearApiKey(
   void vscode.window.showInformationMessage('GPTStudio API key cleared.');
 }
 
-async function pingApiStatus(context: vscode.ExtensionContext): Promise<void> {
+async function pingApiStatusCommand(context: vscode.ExtensionContext): Promise<void> {
+  return pingApiStatusInternal(context, { silent: false });
+}
+
+async function pingApiStatusInternal(
+  context: vscode.ExtensionContext,
+  options: { silent: boolean }
+): Promise<void> {
   const storedKey = await context.secrets.get(SECRET_API_KEY);
   const storedBase = await context.secrets.get(SECRET_API_BASE);
   const apiKey = storedKey ?? process.env.OPENAI_API_KEY ?? process.env.GPTSTUDIO_API_KEY;
   const baseUrl =
     storedBase ?? process.env.OPENAI_BASE_URL ?? process.env.GPTSTUDIO_API_BASE ?? 'https://api.openai.com/v1';
   if (!apiKey) {
-    void vscode.window.showErrorMessage('GPTStudio: No API key found. Run "GPTStudio: Set API Key" first.');
+    if (!options.silent) {
+      void vscode.window.showErrorMessage('GPTStudio: No API key found. Run "GPTStudio: Set API Key" first.');
+    }
     return;
   }
   const source = storedKey ? 'secret' : process.env.OPENAI_API_KEY || process.env.GPTSTUDIO_API_KEY ? 'env' : 'none';
   const url = `${baseUrl.replace(/\/$/, '')}/models`;
   gptstudioLogger.appendLine(`[Ping] Hitting ${url} (key source: ${source})`);
-  try {
-    const res = await fetch(url, {
-      method: 'GET',
-      headers: {
-        Authorization: `Bearer ${apiKey}`
+  const maxAttempts = options.silent ? 2 : 3;
+  let attempt = 0;
+  while (attempt < maxAttempts) {
+    attempt++;
+    try {
+      const res = await fetch(url, {
+        method: 'GET',
+        headers: {
+          Authorization: `Bearer ${apiKey}`
+        }
+      });
+      if (!res.ok) {
+        const text = await res.text();
+        gptstudioLogger.appendLine(`[Ping] Attempt ${attempt} failed ${res.status} ${res.statusText}: ${text}`);
+        if (attempt >= maxAttempts) {
+          if (!options.silent) {
+            void vscode.window.showErrorMessage(`GPTStudio API ping failed (${res.status}). See output for details.`);
+          }
+        }
+      } else {
+        gptstudioLogger.appendLine(`[Ping] API reachable on attempt ${attempt}.`);
+        if (!options.silent) {
+          void vscode.window.showInformationMessage('GPTStudio API ping succeeded.');
+        }
+        return;
       }
-    });
-    if (!res.ok) {
-      const text = await res.text();
-      gptstudioLogger.appendLine(`[Ping] Failed ${res.status} ${res.statusText}: ${text}`);
-      void vscode.window.showErrorMessage(`GPTStudio API ping failed (${res.status}). See output for details.`);
-      return;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      gptstudioLogger.appendLine(`[Ping] Attempt ${attempt} error: ${message}`);
+      if (err instanceof Error && err.stack) {
+        gptstudioLogger.appendLine(err.stack);
+      }
+      if (attempt >= maxAttempts && !options.silent) {
+        void vscode.window.showErrorMessage(`GPTStudio API ping error: ${message}`);
+      }
     }
-    gptstudioLogger.appendLine('[Ping] API reachable.');
-    void vscode.window.showInformationMessage('GPTStudio API ping succeeded.');
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    gptstudioLogger.appendLine(`[Ping] Error: ${message}`);
-    if (err instanceof Error && err.stack) {
-      gptstudioLogger.appendLine(err.stack);
+    if (attempt < maxAttempts) {
+      await new Promise((resolve) => setTimeout(resolve, 500));
     }
-    void vscode.window.showErrorMessage(`GPTStudio API ping error: ${message}`);
   }
 }
