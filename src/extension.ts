@@ -129,6 +129,7 @@ class GptStudioViewProvider implements vscode.WebviewViewProvider {
     private readonly context: vscode.ExtensionContext,
     private apiConfig: { apiKey?: string; baseUrl?: string }
   ) {
+    gptstudioLogger.appendLine('[WebviewProvider] Initializing with provided API config.');
     this.modelClient = createModelClient(apiConfig.apiKey, apiConfig.baseUrl);
     this.customGptService = new CustomGptService({
       apiKey: apiConfig.apiKey ?? process.env.OPENAI_API_KEY ?? process.env.GPTSTUDIO_API_KEY,
@@ -167,7 +168,7 @@ class GptStudioViewProvider implements vscode.WebviewViewProvider {
         gptstudioLogger.appendLine('[Webview] Ready received, posting state and kicking off silent ping.');
         this.postState();
         await this.postContextPreview();
-        void pingApiStatusInternal(this.context, { silent: true });
+        void pingApiStatusInternal(this.context, { silent: true, label: 'ready' });
         break;
       case 'modelChanged':
         this.selectedModel = message.model;
@@ -187,7 +188,7 @@ class GptStudioViewProvider implements vscode.WebviewViewProvider {
       case 'retryConnection':
         gptstudioLogger.appendLine('[Webview] Retry connection requested.');
         await this.refreshCustomGpts();
-        void pingApiStatusInternal(this.context, { silent: true });
+        void pingApiStatusInternal(this.context, { silent: true, label: 'retry' });
         break;
       case 'webviewError':
         gptstudioLogger.appendLine(
@@ -252,7 +253,7 @@ class GptStudioViewProvider implements vscode.WebviewViewProvider {
     this.view?.webview.postMessage(message);
   }
 
-  private async refreshCustomGpts(): Promise<void> {
+  public async refreshCustomGpts(): Promise<void> {
     try {
       const list = await this.customGptService.load();
       this.customGpts = list;
@@ -609,6 +610,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       vscode.commands.registerCommand('gptstudio.setApiKey', () => setApiKey(context, panelProvider)),
       vscode.commands.registerCommand('gptstudio.clearApiKey', () => clearApiKey(context, panelProvider)),
       vscode.commands.registerCommand('gptstudio.pingApiStatus', () => pingApiStatusCommand(context)),
+      vscode.commands.registerCommand('gptstudio.refreshPanel', () => refreshPanel(panelProvider, context)),
       vscode.window.registerWebviewViewProvider(GptStudioViewProvider.viewId, panelProvider)
     );
     gptstudioLogger.appendLine('GPTStudio extension activated.');
@@ -666,12 +668,12 @@ async function clearApiKey(
 }
 
 async function pingApiStatusCommand(context: vscode.ExtensionContext): Promise<void> {
-  return pingApiStatusInternal(context, { silent: false });
+  return pingApiStatusInternal(context, { silent: false, label: 'manual' });
 }
 
 async function pingApiStatusInternal(
   context: vscode.ExtensionContext,
-  options: { silent: boolean }
+  options: { silent: boolean; label: string }
 ): Promise<void> {
   const storedKey = await context.secrets.get(SECRET_API_KEY);
   const storedBase = await context.secrets.get(SECRET_API_BASE);
@@ -686,9 +688,10 @@ async function pingApiStatusInternal(
   }
   const source = storedKey ? 'secret' : process.env.OPENAI_API_KEY || process.env.GPTSTUDIO_API_KEY ? 'env' : 'none';
   const url = `${baseUrl.replace(/\/$/, '')}/models`;
-  gptstudioLogger.appendLine(`[Ping] Hitting ${url} (key source: ${source})`);
-  const maxAttempts = options.silent ? 2 : 3;
+  gptstudioLogger.appendLine(`[Ping:${options.label}] Hitting ${url} (key source: ${source})`);
+  const maxAttempts = options.silent ? 3 : 4;
   let attempt = 0;
+  let delay = 500;
   while (attempt < maxAttempts) {
     attempt++;
     try {
@@ -700,14 +703,16 @@ async function pingApiStatusInternal(
       });
       if (!res.ok) {
         const text = await res.text();
-        gptstudioLogger.appendLine(`[Ping] Attempt ${attempt} failed ${res.status} ${res.statusText}: ${text}`);
+        gptstudioLogger.appendLine(
+          `[Ping:${options.label}] Attempt ${attempt} failed ${res.status} ${res.statusText}: ${text}`
+        );
         if (attempt >= maxAttempts) {
           if (!options.silent) {
             void vscode.window.showErrorMessage(`GPTStudio API ping failed (${res.status}). See output for details.`);
           }
         }
       } else {
-        gptstudioLogger.appendLine(`[Ping] API reachable on attempt ${attempt}.`);
+        gptstudioLogger.appendLine(`[Ping:${options.label}] API reachable on attempt ${attempt}.`);
         if (!options.silent) {
           void vscode.window.showInformationMessage('GPTStudio API ping succeeded.');
         }
@@ -715,7 +720,7 @@ async function pingApiStatusInternal(
       }
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
-      gptstudioLogger.appendLine(`[Ping] Attempt ${attempt} error: ${message}`);
+      gptstudioLogger.appendLine(`[Ping:${options.label}] Attempt ${attempt} error: ${message}`);
       if (err instanceof Error && err.stack) {
         gptstudioLogger.appendLine(err.stack);
       }
@@ -724,7 +729,14 @@ async function pingApiStatusInternal(
       }
     }
     if (attempt < maxAttempts) {
-      await new Promise((resolve) => setTimeout(resolve, 500));
+      await new Promise((resolve) => setTimeout(resolve, delay));
+      delay = Math.min(delay * 2, 2500);
     }
   }
+}
+
+async function refreshPanel(provider: GptStudioViewProvider, context: vscode.ExtensionContext): Promise<void> {
+  gptstudioLogger.appendLine('[Refresh] Manual refresh triggered.');
+  await provider.refreshCustomGpts();
+  await pingApiStatusInternal(context, { silent: false, label: 'refresh' });
 }

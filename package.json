@@ -17,6 +17,7 @@
     "onCommand:gptstudio.setApiKey",
     "onCommand:gptstudio.clearApiKey",
     "onCommand:gptstudio.pingApiStatus",
+    "onCommand:gptstudio.refreshPanel",
     "onView:gptstudio.panel"
   ],
   "main": "./dist/extension.js",
@@ -59,6 +60,10 @@
       {
         "command": "gptstudio.pingApiStatus",
         "title": "GPTStudio: Ping API Status"
+      },
+      {
+        "command": "gptstudio.refreshPanel",
+        "title": "GPTStudio: Refresh Panel"
       }
     ],
     "views": {
