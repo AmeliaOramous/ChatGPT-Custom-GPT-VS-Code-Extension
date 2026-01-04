@@ -5,6 +5,11 @@
       "type": "npm",
       "script": "compile",
       "group": "build",
+      "options": {
+        "env": {
+          "PATH": "${workspaceFolder}\\.tools\\node-v24.12.0-win-x64;${env:PATH}"
+        }
+      },
       "problemMatcher": [
         "$tsc"
       ],
@@ -14,6 +19,11 @@
       "type": "npm",
       "script": "watch",
       "isBackground": true,
+      "options": {
+        "env": {
+          "PATH": "${workspaceFolder}\\.tools\\node-v24.12.0-win-x64;${env:PATH}"
+        }
+      },
       "problemMatcher": [
         "$tsc-watch"
       ],
