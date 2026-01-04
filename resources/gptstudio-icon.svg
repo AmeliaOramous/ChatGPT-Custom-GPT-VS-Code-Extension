@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <defs>
+    <linearGradient id="gptstudioGrad" x1="0" y1="0" x2="64" y2="64" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#38bdf8"/>
+      <stop offset="1" stop-color="#0ea5e9"/>
+    </linearGradient>
+  </defs>
+  <rect x="6" y="6" width="52" height="52" rx="12" fill="#0f172a"/>
+  <rect x="10" y="10" width="44" height="44" rx="10" fill="url(#gptstudioGrad)" opacity="0.9"/>
+  <path d="M20 40c0-8 6-14 14-14h10M34 26l10 10" stroke="#0b1222" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="24" cy="24" r="4" fill="#0b1222"/>
+</svg>

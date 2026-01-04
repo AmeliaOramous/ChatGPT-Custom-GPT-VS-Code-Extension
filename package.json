@@ -20,6 +20,15 @@
     "dotenv": "^16.4.5"
   },
   "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "gptstudio",
+          "title": "GPTStudio",
+          "icon": "resources/gptstudio-icon.svg"
+        }
+      ]
+    },
     "commands": [
       {
         "command": "gptstudio.reviewLastCommit",
@@ -31,7 +40,7 @@
       }
     ],
     "views": {
-      "explorer": [
+      "gptstudio": [
         {
           "id": "gptstudio.panel",
           "name": "GPTStudio Panel"

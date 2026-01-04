@@ -20,6 +20,9 @@ npm run compile
 - `GPTStudio: Apply Suggested Patch` (`gptstudio.applySuggestedPatch`): placeholder for a guarded apply flow.
 - GPTStudio Panel (`gptstudio.panel` view in Explorer): opens a sidebar webview to select a model, pick a Custom GPT persona, choose a mode (Chat, Agent, Full Agent), see a preview of workspace files included as context (file list + open buffers), and send prompts. Streams responses; falls back to a mock client if no API key is set.
 
+### UI
+- Dedicated activity bar icon opens the GPTStudio view container. Inside, the GPTStudio Panel hosts model/custom GPT selection, mode, prompt, context preview, and streamed responses.
+
 ### Dev Notes
 - Code lives in `src/extension.ts`; compiled output goes to `dist/`.
 - Launch configs in `.vscode/launch.json` and tasks in `.vscode/tasks.json` support "Run Extension" with prelaunch TypeScript compile.
