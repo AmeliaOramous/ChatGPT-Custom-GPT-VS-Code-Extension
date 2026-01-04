@@ -653,14 +653,20 @@ async function clearApiKey(
 }
 
 async function pingApiStatus(context: vscode.ExtensionContext): Promise<void> {
-  const apiKey = (await context.secrets.get(SECRET_API_KEY)) ?? process.env.OPENAI_API_KEY ?? process.env.GPTSTUDIO_API_KEY;
-  const baseUrl = (await context.secrets.get(SECRET_API_BASE)) ?? process.env.OPENAI_BASE_URL ?? process.env.GPTSTUDIO_API_BASE ?? 'https://api.openai.com/v1';
+  const storedKey = await context.secrets.get(SECRET_API_KEY);
+  const storedBase = await context.secrets.get(SECRET_API_BASE);
+  const apiKey = storedKey ?? process.env.OPENAI_API_KEY ?? process.env.GPTSTUDIO_API_KEY;
+  const baseUrl =
+    storedBase ?? process.env.OPENAI_BASE_URL ?? process.env.GPTSTUDIO_API_BASE ?? 'https://api.openai.com/v1';
   if (!apiKey) {
     void vscode.window.showErrorMessage('GPTStudio: No API key found. Run "GPTStudio: Set API Key" first.');
     return;
   }
+  const source = storedKey ? 'secret' : process.env.OPENAI_API_KEY || process.env.GPTSTUDIO_API_KEY ? 'env' : 'none';
+  const url = `${baseUrl.replace(/\/$/, '')}/models`;
+  gptstudioLogger.appendLine(`[Ping] Hitting ${url} (key source: ${source})`);
   try {
-    const res = await fetch(`${baseUrl.replace(/\/$/, '')}/models`, {
+    const res = await fetch(url, {
       method: 'GET',
       headers: {
         Authorization: `Bearer ${apiKey}`
@@ -668,7 +674,7 @@ async function pingApiStatus(context: vscode.ExtensionContext): Promise<void> {
     });
     if (!res.ok) {
       const text = await res.text();
-      gptstudioLogger.appendLine(`[Ping] Failed ${res.status}: ${text}`);
+      gptstudioLogger.appendLine(`[Ping] Failed ${res.status} ${res.statusText}: ${text}`);
       void vscode.window.showErrorMessage(`GPTStudio API ping failed (${res.status}). See output for details.`);
       return;
     }
@@ -677,6 +683,9 @@ async function pingApiStatus(context: vscode.ExtensionContext): Promise<void> {
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     gptstudioLogger.appendLine(`[Ping] Error: ${message}`);
+    if (err instanceof Error && err.stack) {
+      gptstudioLogger.appendLine(err.stack);
+    }
     void vscode.window.showErrorMessage(`GPTStudio API ping error: ${message}`);
   }
 }
