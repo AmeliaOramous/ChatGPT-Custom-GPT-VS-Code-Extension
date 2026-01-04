@@ -40,8 +40,8 @@
     }
   },
   "scripts": {
-    "compile": "tsc -p .",
-    "watch": "tsc -w -p .",
+    "compile": "tsc -p tsconfig.build.json",
+    "watch": "tsc -w -p tsconfig.build.json",
     "lint": "eslint src --ext .ts",
     "test": "vitest run"
   },
