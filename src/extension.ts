@@ -5,6 +5,8 @@ import { buildContextBundle, ContextBundle } from './context';
 import { createModelClient, Mode, ModelClient } from './modelClient';
 import { CustomGpt, CustomGptService } from './customGptService';
 
+const gptstudioLogger = vscode.window.createOutputChannel('GPTStudio');
+
 type GitExtension = {
   getAPI(version: number): {
     repositories: Array<{
@@ -107,17 +109,15 @@ class GptStudioViewProvider implements vscode.WebviewViewProvider {
   private mode: Mode = 'chat';
   private modelClient: ModelClient;
   private lastContext?: ContextBundle;
-  private readonly logger: vscode.OutputChannel;
   private readonly customGptService: CustomGptService;
 
   constructor(private readonly context: vscode.ExtensionContext) {
     this.modelClient = createModelClient();
-    this.logger = vscode.window.createOutputChannel('GPTStudio');
     this.customGptService = new CustomGptService({
       apiKey: process.env.OPENAI_API_KEY || process.env.GPTSTUDIO_API_KEY,
       baseUrl: process.env.OPENAI_BASE_URL || process.env.GPTSTUDIO_API_BASE,
       envList: process.env.GPTSTUDIO_CUSTOM_GPTS,
-      logger: this.logger
+      logger: gptstudioLogger
     });
   }
 
@@ -165,7 +165,7 @@ class GptStudioViewProvider implements vscode.WebviewViewProvider {
     this.lastContext = context;
     this.postContextPreview(context);
     this.view?.webview.postMessage({ type: 'responseStart' } satisfies ExtensionMessage);
-    this.logger.appendLine(
+    gptstudioLogger.appendLine(
       `[Chat] model=${this.selectedModel} mode=${this.mode} customGpt=${this.selectedCustomGpt ?? 'none'}`
     );
 
@@ -183,7 +183,7 @@ class GptStudioViewProvider implements vscode.WebviewViewProvider {
       this.view?.webview.postMessage({ type: 'responseDone', text: final } satisfies ExtensionMessage);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Unknown error';
-      this.logger.appendLine(`[Chat error] ${message}`);
+      gptstudioLogger.appendLine(`[Chat error] ${message}`);
       this.view?.webview.postMessage({ type: 'error', message } satisfies ExtensionMessage);
     }
   }
@@ -218,7 +218,7 @@ class GptStudioViewProvider implements vscode.WebviewViewProvider {
       this.selectedCustomGpt = list[0]?.id;
       this.postState();
     } catch (err) {
-      this.logger.appendLine(
+      gptstudioLogger.appendLine(
         `[Custom GPT load] ${err instanceof Error ? err.message : 'Unknown error loading custom GPTs.'}`
       );
       this.customGpts = [];
@@ -505,15 +505,14 @@ function loadCustomGpts(): Array<{ id: string; label: string }> {
 
 export function activate(context: vscode.ExtensionContext): void {
   loadEnv(context);
-  const bootLogger = vscode.window.createOutputChannel('GPTStudio');
-  bootLogger.appendLine('Activating GPTStudio extension…');
+  gptstudioLogger.appendLine('Activating GPTStudio extension…');
   const panelProvider = new GptStudioViewProvider(context);
   context.subscriptions.push(
     vscode.commands.registerCommand('gptstudio.reviewLastCommit', reviewLastCommit),
     vscode.commands.registerCommand('gptstudio.applySuggestedPatch', applySuggestedPatch),
     vscode.window.registerWebviewViewProvider(GptStudioViewProvider.viewId, panelProvider)
   );
-  bootLogger.appendLine('GPTStudio extension activated.');
+  gptstudioLogger.appendLine('GPTStudio extension activated.');
 }
 
 export function deactivate(): void {
