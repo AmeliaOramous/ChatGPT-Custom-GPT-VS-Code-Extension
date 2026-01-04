@@ -164,8 +164,10 @@ class GptStudioViewProvider implements vscode.WebviewViewProvider {
           clearTimeout(this.readyTimeout);
           this.readyTimeout = undefined;
         }
+        gptstudioLogger.appendLine('[Webview] Ready received, posting state and kicking off silent ping.');
         this.postState();
         await this.postContextPreview();
+        void pingApiStatusInternal(this.context, { silent: true });
         break;
       case 'modelChanged':
         this.selectedModel = message.model;
