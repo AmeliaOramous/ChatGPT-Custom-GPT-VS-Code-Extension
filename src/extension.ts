@@ -8,6 +8,9 @@ import { CustomGpt, CustomGptService } from './customGptService';
 const gptstudioLogger = vscode.window.createOutputChannel('GPTStudio');
 gptstudioLogger.appendLine('GPTStudio module loaded.');
 
+const SECRET_API_KEY = 'gptstudio.apiKey';
+const SECRET_API_BASE = 'gptstudio.apiBase';
+
 type GitExtension = {
   getAPI(version: number): {
     repositories: Array<{
@@ -118,14 +121,17 @@ class GptStudioViewProvider implements vscode.WebviewViewProvider {
   private mode: Mode = 'chat';
   private modelClient: ModelClient;
   private lastContext?: ContextBundle;
-  private readonly customGptService: CustomGptService;
+  private customGptService: CustomGptService;
   private readyTimeout?: NodeJS.Timeout;
 
-  constructor(private readonly context: vscode.ExtensionContext) {
-    this.modelClient = createModelClient();
+  constructor(
+    private readonly context: vscode.ExtensionContext,
+    private apiConfig: { apiKey?: string; baseUrl?: string }
+  ) {
+    this.modelClient = createModelClient(apiConfig.apiKey, apiConfig.baseUrl);
     this.customGptService = new CustomGptService({
-      apiKey: process.env.OPENAI_API_KEY || process.env.GPTSTUDIO_API_KEY,
-      baseUrl: process.env.OPENAI_BASE_URL || process.env.GPTSTUDIO_API_BASE,
+      apiKey: apiConfig.apiKey ?? process.env.OPENAI_API_KEY ?? process.env.GPTSTUDIO_API_KEY,
+      baseUrl: apiConfig.baseUrl ?? process.env.OPENAI_BASE_URL ?? process.env.GPTSTUDIO_API_BASE,
       envList: process.env.GPTSTUDIO_CUSTOM_GPTS,
       logger: gptstudioLogger
     });
@@ -252,6 +258,19 @@ class GptStudioViewProvider implements vscode.WebviewViewProvider {
       this.selectedCustomGpt = undefined;
       this.postState();
     }
+  }
+
+  public updateApiConfig(apiKey?: string, baseUrl?: string): void {
+    this.apiConfig = { apiKey, baseUrl };
+    this.modelClient = createModelClient(apiKey, baseUrl);
+    this.customGptService = new CustomGptService({
+      apiKey: apiKey ?? process.env.OPENAI_API_KEY ?? process.env.GPTSTUDIO_API_KEY,
+      baseUrl: baseUrl ?? process.env.OPENAI_BASE_URL ?? process.env.GPTSTUDIO_API_BASE,
+      envList: process.env.GPTSTUDIO_CUSTOM_GPTS,
+      logger: gptstudioLogger
+    });
+    void this.refreshCustomGpts();
+    gptstudioLogger.appendLine('[API] Updated API config from secrets/env.');
   }
 
   private getHtml(webview: vscode.Webview): string {
@@ -569,10 +588,13 @@ export function activate(context: vscode.ExtensionContext): void {
   gptstudioLogger.appendLine('Activating GPTStudio extension.');
   try {
     loadEnv(context);
-    const panelProvider = new GptStudioViewProvider(context);
+    const apiConfig = resolveApiConfig(context);
+    const panelProvider = new GptStudioViewProvider(context, apiConfig);
     context.subscriptions.push(
       vscode.commands.registerCommand('gptstudio.reviewLastCommit', reviewLastCommit),
       vscode.commands.registerCommand('gptstudio.applySuggestedPatch', applySuggestedPatch),
+      vscode.commands.registerCommand('gptstudio.setApiKey', () => setApiKey(context, panelProvider)),
+      vscode.commands.registerCommand('gptstudio.clearApiKey', () => clearApiKey(context, panelProvider)),
       vscode.window.registerWebviewViewProvider(GptStudioViewProvider.viewId, panelProvider)
     );
     gptstudioLogger.appendLine('GPTStudio extension activated.');
@@ -586,4 +608,43 @@ export function activate(context: vscode.ExtensionContext): void {
 
 export function deactivate(): void {
   // noop
+}
+
+function resolveApiConfig(context: vscode.ExtensionContext): { apiKey?: string; baseUrl?: string } {
+  const apiKey = process.env.OPENAI_API_KEY ?? process.env.GPTSTUDIO_API_KEY;
+  const baseUrl = process.env.OPENAI_BASE_URL ?? process.env.GPTSTUDIO_API_BASE;
+
+  return {
+    apiKey: apiKey ?? undefined,
+    baseUrl: baseUrl ?? undefined
+  };
+}
+
+async function setApiKey(
+  context: vscode.ExtensionContext,
+  provider: GptStudioViewProvider
+): Promise<void> {
+  const value = await vscode.window.showInputBox({
+    prompt: 'Enter your OpenAI-compatible API key',
+    placeHolder: 'sk-...',
+    password: true,
+    ignoreFocusOut: true
+  });
+  if (!value) {
+    return;
+  }
+  await context.secrets.store(SECRET_API_KEY, value);
+  gptstudioLogger.appendLine('[API] Stored API key in secret storage.');
+  provider.updateApiConfig(value, undefined);
+  void vscode.window.showInformationMessage('GPTStudio API key saved to secret storage.');
+}
+
+async function clearApiKey(
+  context: vscode.ExtensionContext,
+  provider: GptStudioViewProvider
+): Promise<void> {
+  await context.secrets.delete(SECRET_API_KEY);
+  gptstudioLogger.appendLine('[API] Cleared stored API key.');
+  provider.updateApiConfig(undefined, undefined);
+  void vscode.window.showInformationMessage('GPTStudio API key cleared.');
 }

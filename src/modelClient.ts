@@ -14,12 +14,12 @@ export type ModelClient = {
   chat(request: ChatRequest, onChunk?: (chunk: string) => void): Promise<string>;
 };
 
-export function createModelClient(): ModelClient {
-  const apiKey = process.env.OPENAI_API_KEY || process.env.GPTSTUDIO_API_KEY;
-  const baseUrl = process.env.OPENAI_BASE_URL || process.env.GPTSTUDIO_API_BASE;
+export function createModelClient(apiKey?: string, baseUrl?: string): ModelClient {
+  const key = apiKey ?? process.env.OPENAI_API_KEY ?? process.env.GPTSTUDIO_API_KEY;
+  const url = baseUrl ?? process.env.OPENAI_BASE_URL ?? process.env.GPTSTUDIO_API_BASE;
 
-  if (apiKey) {
-    return new OpenAiModelClient(apiKey, baseUrl);
+  if (key) {
+    return new OpenAiModelClient(key, url);
   }
 
   return new MockModelClient();

@@ -14,6 +14,8 @@
     "onStartupFinished",
     "onCommand:gptstudio.reviewLastCommit",
     "onCommand:gptstudio.applySuggestedPatch",
+    "onCommand:gptstudio.setApiKey",
+    "onCommand:gptstudio.clearApiKey",
     "onView:gptstudio.panel"
   ],
   "main": "./dist/extension.js",
@@ -44,6 +46,14 @@
       {
         "command": "gptstudio.applySuggestedPatch",
         "title": "GPTStudio: Apply Suggested Patch"
+      },
+      {
+        "command": "gptstudio.setApiKey",
+        "title": "GPTStudio: Set API Key (store securely)"
+      },
+      {
+        "command": "gptstudio.clearApiKey",
+        "title": "GPTStudio: Clear Stored API Key"
       }
     ],
     "views": {
