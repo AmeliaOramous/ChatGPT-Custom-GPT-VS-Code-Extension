@@ -3,7 +3,7 @@
   "displayName": "GPTStudio",
   "description": "Gertrude-style commit review helper for VS Code.",
   "version": "0.0.1-alpha",
-  "publisher": "your-name",
+  "publisher": "local",
   "engines": {
     "vscode": "^1.85.0"
   },
