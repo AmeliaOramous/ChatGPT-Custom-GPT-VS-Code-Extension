@@ -11,6 +11,7 @@
     "Other"
   ],
   "activationEvents": [
+    "onStartupFinished",
     "onCommand:gptstudio.reviewLastCommit",
     "onCommand:gptstudio.applySuggestedPatch",
     "onView:gptstudio.panel"
@@ -29,6 +30,12 @@
         }
       ]
     },
+    "viewsWelcome": [
+      {
+        "view": "gptstudio.panel",
+        "contents": "Loading GPTStudio…\nIf this message persists, reload the window and ensure the extension is activated."
+      }
+    ],
     "commands": [
       {
         "command": "gptstudio.reviewLastCommit",

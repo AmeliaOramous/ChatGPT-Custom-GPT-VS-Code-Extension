@@ -505,12 +505,15 @@ function loadCustomGpts(): Array<{ id: string; label: string }> {
 
 export function activate(context: vscode.ExtensionContext): void {
   loadEnv(context);
+  const bootLogger = vscode.window.createOutputChannel('GPTStudio');
+  bootLogger.appendLine('Activating GPTStudio extension…');
   const panelProvider = new GptStudioViewProvider(context);
   context.subscriptions.push(
     vscode.commands.registerCommand('gptstudio.reviewLastCommit', reviewLastCommit),
     vscode.commands.registerCommand('gptstudio.applySuggestedPatch', applySuggestedPatch),
     vscode.window.registerWebviewViewProvider(GptStudioViewProvider.viewId, panelProvider)
   );
+  bootLogger.appendLine('GPTStudio extension activated.');
 }
 
 export function deactivate(): void {
