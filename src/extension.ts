@@ -77,7 +77,15 @@ type WebviewMessage =
   | { type: 'chat'; content: string }
   | { type: 'modelChanged'; model: string }
   | { type: 'customGptChanged'; id: string }
-  | { type: 'modeChanged'; mode: Mode };
+  | { type: 'modeChanged'; mode: Mode }
+  | {
+      type: 'webviewError';
+      message: string;
+      source?: string;
+      line?: number;
+      column?: number;
+      stack?: string;
+    };
 
 type ExtensionMessage =
   | {
@@ -111,6 +119,7 @@ class GptStudioViewProvider implements vscode.WebviewViewProvider {
   private modelClient: ModelClient;
   private lastContext?: ContextBundle;
   private readonly customGptService: CustomGptService;
+  private readyTimeout?: NodeJS.Timeout;
 
   constructor(private readonly context: vscode.ExtensionContext) {
     this.modelClient = createModelClient();
@@ -133,11 +142,21 @@ class GptStudioViewProvider implements vscode.WebviewViewProvider {
 
     // Kick off async load of custom GPTs without blocking UI
     void this.refreshCustomGpts();
+
+    // Failsafe to detect stuck webview init
+    this.readyTimeout = setTimeout(() => {
+      gptstudioLogger.appendLine('[Webview] ready signal timeout (5s).');
+      void vscode.window.showWarningMessage('GPTStudio panel is taking longer to load.');
+    }, 5000);
   }
 
   private async handleMessage(message: WebviewMessage): Promise<void> {
     switch (message.type) {
       case 'ready':
+        if (this.readyTimeout) {
+          clearTimeout(this.readyTimeout);
+          this.readyTimeout = undefined;
+        }
         this.postState();
         await this.postContextPreview();
         break;
@@ -155,6 +174,13 @@ class GptStudioViewProvider implements vscode.WebviewViewProvider {
         break;
       case 'chat':
         await this.handleChat(message.content);
+        break;
+      case 'webviewError':
+        gptstudioLogger.appendLine(
+          `[Webview error] ${message.message} ${message.source ?? ''}:${message.line ?? ''}:${message.column ?? ''} ${
+            message.stack ?? ''
+          }`
+        );
         break;
       default:
         this.view?.webview.postMessage({ type: 'error', message: 'Unknown message type' } satisfies ExtensionMessage);
@@ -383,7 +409,7 @@ class GptStudioViewProvider implements vscode.WebviewViewProvider {
     <div class="section-title">Transcript</div>
     <div class="log" id="log">Ready.</div>
   </div>
-    <script nonce="${nonce}">
+  <script nonce="${nonce}">
     const vscode = acquireVsCodeApi();
     const modelSelect = document.getElementById('model');
     const customGptSelect = document.getElementById('customGpt');
@@ -400,6 +426,26 @@ class GptStudioViewProvider implements vscode.WebviewViewProvider {
       logEl.textContent += text;
       logEl.scrollTop = logEl.scrollHeight;
     }
+
+    window.onerror = (message, source, lineno, colno, error) => {
+      vscode.postMessage({
+        type: 'webviewError',
+        message: String(message),
+        source,
+        line: lineno,
+        column: colno,
+        stack: error && error.stack ? error.stack : undefined
+      });
+      return true;
+    };
+    window.addEventListener('unhandledrejection', ev => {
+      vscode.postMessage({
+        type: 'webviewError',
+        message: 'UnhandledRejection',
+        source: 'promise',
+        stack: ev.reason && ev.reason.stack ? ev.reason.stack : String(ev.reason)
+      });
+    });
 
     window.addEventListener('message', event => {
       const msg = event.data;
