@@ -135,11 +135,13 @@ class GptStudioViewProvider implements vscode.WebviewViewProvider {
       apiKey: apiConfig.apiKey ?? process.env.OPENAI_API_KEY ?? process.env.GPTSTUDIO_API_KEY,
       baseUrl: apiConfig.baseUrl ?? process.env.OPENAI_BASE_URL ?? process.env.GPTSTUDIO_API_BASE,
       envList: process.env.GPTSTUDIO_CUSTOM_GPTS,
+      endpointOverride: process.env.GPTSTUDIO_GPTS_ENDPOINT,
       logger: gptstudioLogger
     });
   }
 
   resolveWebviewView(webviewView: vscode.WebviewView): void | Thenable<void> {
+    gptstudioLogger.appendLine('[WebviewProvider] Resolving view.');
     this.view = webviewView;
     const { webview } = webviewView;
     webview.options = {
